@@ -11,9 +11,13 @@ import com.revrobotics.CANSparkMax;
 import com.revrobotics.CANSparkMax.IdleMode;
 import com.revrobotics.CANSparkMaxLowLevel.MotorType;
 
+
+import edu.wpi.first.cameraserver.CameraServer;
+
 import edu.wpi.first.wpilibj.Joystick;
 import edu.wpi.first.wpilibj.TimedRobot;
 import edu.wpi.first.wpilibj.Timer;
+import edu.wpi.first.wpilibj.XboxController;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 
@@ -62,6 +66,8 @@ public class Robot extends TimedRobot {
    * that you feel is more comfortable.
    */
   Joystick j = new Joystick(0);
+  XboxController X = new XboxController(0);//[USB port 0 on the computer]
+  XboxController X2 = new XboxController(1);
 
   /*
    * Magic numbers. Use these to adjust settings.
@@ -75,12 +81,14 @@ public class Robot extends TimedRobot {
   /**
    * Percent output to run the arm up/down at
    */
-  static final double ARM_OUTPUT_POWER = 0.4;
+  static final double ARM_OUTPUT_POWER = 1.0;
 
   /**
    * How many amps the intake can use while picking up
    */
-  static final int INTAKE_CURRENT_LIMIT_A = 25;
+  static final int INTAKE_CURRENT_LIMIT_A = 15;
+
+  //Note: Many teams intake motors have been blowing out due to overue. It has been tested that using a lower ampage still allows the intake to work and prevents the motor from blowing out//
 
   /**
    * How many amps the intake can use while holding
@@ -122,6 +130,9 @@ public class Robot extends TimedRobot {
    */
   @Override
   public void robotInit() {
+
+    CameraServer.startAutomaticCapture();
+
     m_chooser.setDefaultOption("do nothing", kNothingAuto);
     m_chooser.addOption("cone and mobility", kConeAuto);
     m_chooser.addOption("cube and mobility", kCubeAuto);
@@ -134,9 +145,10 @@ public class Robot extends TimedRobot {
      * to the set() methods. Push the joystick forward. Reverse the motor
      * if it is going the wrong way. Repeat for the other 3 motors.
      */
-    driveLeftSpark.setInverted(false);
+    driveLeftSpark.setInverted(true);
     driveLeftVictor.setInverted(false);
-    driveRightSpark.setInverted(false);
+
+    driveRightSpark.setInverted(true);
     driveRightVictor.setInverted(false);
 
     /*
@@ -144,10 +156,10 @@ public class Robot extends TimedRobot {
      * If either one is reversed, change that here too. Arm out is defined
      * as positive, arm in is negative.
      */
-    arm.setInverted(true);
-    arm.setIdleMode(IdleMode.kBrake);
-    arm.setSmartCurrentLimit(ARM_CURRENT_LIMIT_A);
-    intake.setInverted(false);
+     arm.setInverted(true);
+     arm.setIdleMode(IdleMode.kBrake);
+     arm.setSmartCurrentLimit(ARM_CURRENT_LIMIT_A);
+     intake.setInverted(false);
     intake.setIdleMode(IdleMode.kBrake);
   }
 
@@ -186,10 +198,10 @@ public class Robot extends TimedRobot {
    * @param percent
    */
   public void setArmMotor(double percent) {
-    arm.set(percent);
-    SmartDashboard.putNumber("arm power (%)", percent);
-    SmartDashboard.putNumber("arm motor current (amps)", arm.getOutputCurrent());
-    SmartDashboard.putNumber("arm motor temperature (C)", arm.getMotorTemperature());
+     arm.set(percent);
+     SmartDashboard.putNumber("arm power (%)", percent);
+     SmartDashboard.putNumber("arm motor current (amps)", arm.getOutputCurrent());
+     SmartDashboard.putNumber("arm motor temperature (C)", arm.getMotorTemperature());
   }
 
   /**
@@ -199,11 +211,11 @@ public class Robot extends TimedRobot {
    * @param amps current limit
    */
   public void setIntakeMotor(double percent, int amps) {
-    intake.set(percent);
-    intake.setSmartCurrentLimit(amps);
-    SmartDashboard.putNumber("intake power (%)", percent);
-    SmartDashboard.putNumber("intake motor current (amps)", intake.getOutputCurrent());
-    SmartDashboard.putNumber("intake motor temperature (C)", intake.getMotorTemperature());
+     intake.set(percent);
+     intake.setSmartCurrentLimit(amps);
+     SmartDashboard.putNumber("intake power (%)", percent);
+     SmartDashboard.putNumber("intake motor current (amps)", intake.getOutputCurrent());
+     SmartDashboard.putNumber("intake motor temperature (C)", intake.getMotorTemperature());
   }
 
   /**
@@ -288,50 +300,55 @@ public class Robot extends TimedRobot {
 
     lastGamePiece = NOTHING;
   }
+static final int UP = 0;
+static final int DOWN = 180;
 
   @Override
   public void teleopPeriodic() {
     double armPower;
-    if (j.getRawButton(7)) {
-      // lower the arm
-      armPower = -ARM_OUTPUT_POWER;
-    } else if (j.getRawButton(5)) {
-      // raise the arm
-      armPower = ARM_OUTPUT_POWER;
-    } else {
-      // do nothing and let it sit where it is
-      armPower = 0.0;
-    }
-    setArmMotor(armPower);
+     if (X2.getPOV() == UP) {
+        // raise the arm
+        var slowPower = ARM_OUTPUT_POWER/2;
+        if(X2.getRawButton(6)) armPower = slowPower;
+        else armPower = ARM_OUTPUT_POWER;
+
+     } else if (X2.getPOV() == DOWN) {
+       // lower the arm 
+       armPower = -ARM_OUTPUT_POWER;
+     } else {
+       // do nothing and let it sit where it is
+       armPower = 0.0;
+     }
+     setArmMotor(armPower);
   
-    double intakePower;
-    int intakeAmps;
-    if (j.getRawButton(8)) {
-      // cube in or cone out
-      intakePower = INTAKE_OUTPUT_POWER;
-      intakeAmps = INTAKE_CURRENT_LIMIT_A;
-      lastGamePiece = CUBE;
-    } else if (j.getRawButton(6)) {
-      // cone in or cube out
-      intakePower = -INTAKE_OUTPUT_POWER;
-      intakeAmps = INTAKE_CURRENT_LIMIT_A;
-      lastGamePiece = CONE;
-    } else if (lastGamePiece == CUBE) {
-      intakePower = INTAKE_HOLD_POWER;
-      intakeAmps = INTAKE_HOLD_CURRENT_LIMIT_A;
-    } else if (lastGamePiece == CONE) {
-      intakePower = -INTAKE_HOLD_POWER;
-      intakeAmps = INTAKE_HOLD_CURRENT_LIMIT_A;
-    } else {
-      intakePower = 0.0;
-      intakeAmps = 0;
-    }
-    setIntakeMotor(intakePower, intakeAmps);
+     double intakePower;
+     int intakeAmps;
+     if (X2.getRawButton(2)) {
+       // cube in or cone out
+       intakePower = INTAKE_OUTPUT_POWER;
+       intakeAmps = INTAKE_CURRENT_LIMIT_A;
+       lastGamePiece = CUBE;
+     } else if (X2.getRawButton(1)) {
+       // cone in or cube out
+       intakePower = -INTAKE_OUTPUT_POWER;
+       intakeAmps = INTAKE_CURRENT_LIMIT_A;
+       lastGamePiece = CONE;
+     } else if (lastGamePiece == CUBE) {
+       intakePower = INTAKE_HOLD_POWER;
+       intakeAmps = INTAKE_HOLD_CURRENT_LIMIT_A;
+     } else if (lastGamePiece == CONE) {
+       intakePower = -INTAKE_HOLD_POWER;
+       intakeAmps = INTAKE_HOLD_CURRENT_LIMIT_A;
+     } else {
+       intakePower = 0.0;
+       intakeAmps = 0;
+     }
+     setIntakeMotor(intakePower, intakeAmps);
 
     /*
      * Negative signs here because the values from the analog sticks are backwards
      * from what we want. Forward returns a negative when we want it positive.
      */
-    setDriveMotors(-j.getRawAxis(1), -j.getRawAxis(2));
+    setDriveMotors(X.getRawAxis(0), X.getRawAxis(1));
   }
 }
